@@ -173,10 +173,10 @@ def run_full_pipeline(
 
 if __name__ == "__main__":
     # Example usage (edit as needed)
-    TICKERS   = ["AAPL"]
-    START     = "2020-01-01"
-    END       = "2021-01-01"
-    BASE_DIR  = "/Users/nikita/Documents/stock_project"
+    TICKERS   = ["AAPL", "MSFT", "TSLA", "NVDA", "AMZN", "GOOGL", "META", "NFLX", "AMD", "INTC"]
+    START     = "2019-03-02"
+    END       = "2024-03-02"
+    BASE_DIR  = "/Users/nikita/Documents/stock_project_train_data"
     API_TOKEN = "rkaf940tbhfpb2l9covo7ldphg2xgjdkd7vuohy8"
 
     run_full_pipeline(
