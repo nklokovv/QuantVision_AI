@@ -168,13 +168,20 @@ class FeaturePreprocessor:
         merged = pd.merge(df, self.xlk_df, on="Date", how="left")
 
         # Select + order exact output columns
+        # cols = [
+        #     "Date", "Volume",
+        #     "SMA_5", "EMA_12", "EMA_26", "RSI_14", "MACD",
+        #     "BB_upper", "BB_lower", "Momentum_10", "Volatility_10d",
+        #     "SMA_5_XLK", "EMA_12_XLK", "EMA_26_XLK", "RSI_14_XLK", "MACD_XLK",
+        #     "BB_upper_XLK", "BB_lower_XLK", "Momentum_10_XLK", "Volatility_10d_XLK",
+        #     "Return_5d", "y_5d"
+        # ]
         cols = [
             "Date", "Volume",
             "SMA_5", "EMA_12", "EMA_26", "RSI_14", "MACD",
             "BB_upper", "BB_lower", "Momentum_10", "Volatility_10d",
             "SMA_5_XLK", "EMA_12_XLK", "EMA_26_XLK", "RSI_14_XLK", "MACD_XLK",
             "BB_upper_XLK", "BB_lower_XLK", "Momentum_10_XLK", "Volatility_10d_XLK",
-            "Return_5d", "y_5d"
         ]
         # Make sure all exist
         for c in cols:

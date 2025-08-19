@@ -117,9 +117,9 @@ def run_price_downloader(
 
 # ---------------- Example regular run (edit values below) ----------------
 if __name__ == "__main__":
-    TICKERS     = ["AAPL"]
-    START       = "2020-01-01"
-    END         = "2021-01-01"        # or None for "up to latest"
+    TICKERS     = ["XLK"]
+    START       = "2025-08-10"
+    END         = "2025-10-18"        # or None for "up to latest"
     BASE_DIR    = "/Users/nikita/Documents/stock_project11"  # ← change to your path
     SUBDIR      = "tickers"           # output subfolder inside BASE_DIR
     INTERVAL    = "1d"                # "1d" | "1wk" | "1mo"

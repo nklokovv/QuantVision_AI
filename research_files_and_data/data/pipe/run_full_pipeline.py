@@ -4,15 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 import glob as _glob
+import time
 import pandas as pd
 
 from research_files_and_data.data.download_data import YFDownloader
 from research_files_and_data.data.preprocess_data import FeaturePreprocessor
 from research_files_and_data.data.stock_news_downloader import StockNewsFetcher
 from research_files_and_data.data.finbert_processor import FinbertSentimentProcessor
-
-
-# ============================== Sentiment feature helpers ==============================
 
 def add_sent_5d_avg(df: pd.DataFrame, sentiment_col: str = "DailySent") -> pd.DataFrame:
     if sentiment_col in df.columns:
@@ -67,7 +65,56 @@ def add_has_sent(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ============================== Pipeline ==============================
+def _yf_dates(start_date: str, end_date: Optional[str]) -> tuple[str, Optional[str]]:
+    """
+    yfinance's 'end' is EXCLUSIVE. Return (start, end_plus_1_day) so your input window is inclusive.
+    """
+    s = pd.to_datetime(start_date).strftime("%Y-%m-%d")
+    e = None if end_date is None else (pd.to_datetime(end_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    return s, e
+
+def _fix_empty_downloads(out_dir: Path, tickers: list[str], start: str, end: Optional[str]) -> None:
+    """
+    If any downloaded CSV is empty/malformed, re-download that ticker via yfinance (single-thread, with retries)
+    and write a clean CSV with a normalized 'Date' column.
+    """
+    try:
+        import yfinance as yf
+    except Exception:
+        print("ℹ️ yfinance not available for fallback; skipping empty-file fix.")
+        return
+
+    for t in sorted(set(tickers)):
+        csv_path = out_dir / f"{t}.csv"
+        needs_fix = True
+        if csv_path.exists():
+            try:
+                probe = pd.read_csv(csv_path, nrows=2)
+                needs_fix = probe.empty or ("Date" not in probe.columns)
+            except Exception:
+                needs_fix = True
+
+        if not needs_fix:
+            continue
+
+        for attempt in range(1, 4):
+            try:
+                df = yf.download(
+                    t, start=start, end=end, interval="1d",
+                    auto_adjust=True, progress=False, threads=False
+                )
+                if not df.empty:
+                    df = df.reset_index()
+                    if "Adj Close" in df.columns:
+                        df = df.rename(columns={"Adj Close": "AdjClose"})
+                    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
+                    df.to_csv(csv_path, index=False)
+                    print(f"   ⚙️ fixed empty download: {t} ({len(df)} rows)")
+                    break
+            except Exception:
+                pass
+            time.sleep(1.2 * attempt)  # backoff
+
 
 def run_full_pipeline(
     tickers: List[str],
@@ -95,21 +142,27 @@ def run_full_pipeline(
     for d in [d_prices, d_processed, d_news_raw, d_news_sc, d_final]:
         d.mkdir(parents=True, exist_ok=True)
 
-    # 1) Prices (tickers + XLK)
+    # ---------------- 1) Prices (tickers + XLK) ----------------
     all_syms = sorted({*(s.upper() for s in tickers), xlk_symbol.upper()})
-    print(f"⬇️  Downloading prices for: {all_syms}")
-    YFDownloader(tickers=all_syms, start=start_date, end=end_date, interval="1d", out_dir=str(d_prices)).save_all()
+    s, e = _yf_dates(start_date, end_date)  # make end inclusive for yfinance
+    print(f"⬇️  Downloading prices for: {all_syms}  range=[{s} → {e or 'latest'})")
+
+    YFDownloader(tickers=all_syms, start=s, end=e, interval="1d", out_dir=str(d_prices)).save_all()
+
+    # Repair any empty/malformed downloads (common with very recent windows)
+    _fix_empty_downloads(d_prices, all_syms, start=s, end=e)
+
     xlk_csv = d_prices / f"{xlk_symbol.upper()}.csv"
 
-    # 2) Preprocess + merge with XLK
+    # ---------------- 2) Preprocess + merge with XLK ----------------
     print("🧮 Preprocessing and merging with XLK features…")
     FeaturePreprocessor(tickers_folder=str(d_prices), xlk_csv_path=str(xlk_csv), out_dir=str(d_processed)).process_all()
 
-    # 3) News download
+    # ---------------- 3) News download ----------------
     print("📰 Fetching news per ticker…")
     StockNewsFetcher(api_token, d_news_raw).fetch_all(tickers, start_date=start_date, end_date=end_date or start_date)
 
-    # 4) FinBERT scoring + daily aggregation
+    # ---------------- 4) FinBERT scoring + daily aggregation ----------------
     print("🧠 Applying FinBERT on news and aggregating daily sentiment…")
     fp = FinbertSentimentProcessor()
     fp.process_dir(d_news_raw, out_dir=d_news_sc)  # per-article scores
@@ -128,20 +181,24 @@ def run_full_pipeline(
             str(d_news_sc / f"*{t.upper()}*_daily.csv"),
         ]
         matches: List[str] = []
-        for p in pats: matches.extend(_glob.glob(p))
-        if not matches: return None
+        for p in pats:
+            matches.extend(_glob.glob(p))
+        if not matches:
+            return None
         matches = sorted(matches, key=lambda p: Path(p).stat().st_mtime, reverse=True)
         return Path(matches[0])
 
-    # 5) Merge per ticker & add features (drop NewsCount before saving)
+    # ---------------- 5) Merge per ticker & add features (drop NewsCount before saving) ----------------
     for t in sorted({s.upper() for s in tickers}):
         proc_csv = d_processed / f"{t}.csv"
         if not proc_csv.exists():
-            print(f"   ⚠️ Missing processed CSV for {t}: {proc_csv}"); continue
+            print(f"   ⚠️ Missing processed CSV for {t}: {proc_csv}")
+            continue
 
         price_df = pd.read_csv(proc_csv)
         if "Date" not in price_df.columns:
-            print(f"   ⚠️ 'Date' missing in {proc_csv.name}, skipping {t}"); continue
+            print(f"   ⚠️ 'Date' missing in {proc_csv.name}, skipping {t}")
+            continue
         price_df["Date"] = pd.to_datetime(price_df["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
 
         daily_path = _latest_daily_for_ticker(t)
@@ -152,7 +209,6 @@ def run_full_pipeline(
             sent_df = pd.read_csv(daily_path)
             if "Date" in sent_df.columns:
                 sent_df["Date"] = pd.to_datetime(sent_df["Date"], errors="coerce").dt.strftime("%Y-%m-%d")
-            # bring in DailySent, and (optionally) NewsCount only for HasSent computation
             keep_cols = [c for c in ["Date", "DailySent", "NewsCount"] if c in sent_df.columns]
             sent_df = sent_df[keep_cols].copy() if keep_cols else pd.DataFrame(columns=["Date"])
             final_df = price_df.merge(sent_df, on="Date", how="left")
@@ -180,9 +236,9 @@ def run_full_pipeline(
 # ------------------------------ Regular main (edit & run) ------------------------------
 if __name__ == "__main__":
     TICKERS   = ["AAPL"]
-    START     = "2019-03-02"
-    END       = "2020-03-02"      # or None
-    BASE_DIR  = "dataset/train_data"  # project-relative
+    START     = "2025-07-01"
+    END       = "2025-08-18"      # or None
+    BASE_DIR  = "/Users/nikita/Documents"  # project-relative
     API_TOKEN = "rkaf940tbhfpb2l9covo7ldphg2xgjdkd7vuohy8"
 
     run_full_pipeline(
