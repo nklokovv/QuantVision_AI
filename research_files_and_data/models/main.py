@@ -1,6 +1,6 @@
 # from models.train_logreg import main as logreg_main
 # from models.train_lightgbm import main as lgbm_main
-from models.train_catboost import main as cat_main
+from research_files_and_data.models.train_catboost import main as cat_main
 # from models.train_lstm import main as lstm_main
 # from models.train_tabtransformer import main as tabtr_main
 # from models.train_tft import main as tft_main

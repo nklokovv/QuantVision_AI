@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 import pandas as pd
 
 # Use your package-style imports as requested
-from data.stock_news_downloader import StockNewsFetcher
-from data.finbert_processor import FinbertSentimentProcessor
+from research_files_and_data.data.stock_news_downloader import StockNewsFetcher
+from research_files_and_data.data.finbert_processor import FinbertSentimentProcessor
 
 
 def _ensure_dir(path: Path) -> None:

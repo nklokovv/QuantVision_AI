@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional
 import pandas as pd  # ← needed for post-download normalization
-from data.download_data import YFDownloader
+from research_files_and_data.data.download_data import YFDownloader
 
 
 def ensure_dir(p: Path) -> None:

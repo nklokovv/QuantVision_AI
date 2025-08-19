@@ -7,8 +7,8 @@ import json
 import pandas as pd
 
 # Your implementations
-from data.stock_news_downloader import StockNewsFetcher
-from data.finbert_processor import FinbertSentimentProcessor
+from research_files_and_data.data.stock_news_downloader import StockNewsFetcher
+from research_files_and_data.data.finbert_processor import FinbertSentimentProcessor
 
 
 # ---------- filesystem ----------

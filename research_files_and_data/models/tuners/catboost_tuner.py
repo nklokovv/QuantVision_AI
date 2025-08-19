@@ -10,7 +10,7 @@ from catboost import CatBoostClassifier, Pool
 from sklearn.metrics import roc_auc_score
 
 # your utilities
-from models.data_utils import load_all_csvs, split_by_tickers, print_metrics
+from research_files_and_data.models.data_utils import load_all_csvs, split_by_tickers, print_metrics
 
 
 # ---------- helpers ----------

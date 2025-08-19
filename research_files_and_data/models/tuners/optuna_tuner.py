@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json, math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ from catboost import CatBoostClassifier, Pool, CatBoostError
 import optuna
 from optuna.samplers import TPESampler
 
-from models.data_utils import load_all_csvs, split_by_tickers, print_metrics
+from research_files_and_data.models.data_utils import load_all_csvs, split_by_tickers, print_metrics
 
 
 def time_val_split_per_ticker(df: pd.DataFrame, val_frac: float = 0.2):
